@@ -1,5 +1,11 @@
 # 🤖 AI Content Bot
 
+<div align="center">
+  <img src="assets/banner.png" alt="AI Content Bot banner" width="100%" />
+</div>
+
+<br>
+
 [![License](https://img.shields.io/github/license/Kreminskaya/ai-content-bot)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://python.org)
 [![aiogram](https://img.shields.io/badge/aiogram-3.x-blue)](https://docs.aiogram.dev)

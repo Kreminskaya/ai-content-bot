@@ -35,6 +35,7 @@ from crewai import Agent, Crew, LLM, Process, Task, TaskOutput
 
 from config import (
     ANTHROPIC_API_KEY,
+    CONTENT_LANGUAGE,
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
     ENABLE_VISUAL_PROMPT,
@@ -64,6 +65,47 @@ def _llm_key() -> str:
     if LLM_PROVIDER == "deepseek":
         return DEEPSEEK_API_KEY
     return OPENAI_API_KEY if LLM_PROVIDER == "openai" else ANTHROPIC_API_KEY
+
+
+# ---------------------------------------------------------------------------
+# Language-specific voice helpers
+# ---------------------------------------------------------------------------
+
+def _lang_slang_examples() -> str:
+    """Return language-appropriate slang examples for the writer prompt."""
+    lang = CONTENT_LANGUAGE.lower()
+    if "russian" in lang or "русск" in lang:
+        return (
+            "• Сленг — обязательно там где уместен: «выкатили», «запустили», «прикрутили»,\n"
+            "  «зарелизили», «задеплоили», «набенчмаркали», «сбили бенчи у GPT-4».\n"
+        )
+    if "english" in lang:
+        return (
+            "• Slang — use it where it fits: 'shipped', 'dropped', 'rolled out',\n"
+            "  'went live', 'crushed the benchmarks', 'blew GPT-4 out of the water'.\n"
+        )
+    return (
+        f"• Use natural, conversational {CONTENT_LANGUAGE} slang where it fits.\n"
+        "  Prefer active verbs: launched, shipped, released, deployed.\n"
+    )
+
+
+def _lang_voice_line() -> str:
+    """Return language-appropriate voice description line."""
+    lang = CONTENT_LANGUAGE.lower()
+    if "russian" in lang or "русск" in lang:
+        return "Живой русский с технической начинкой. Разговорные слова, сленг — ок."
+    if "english" in lang:
+        return "Punchy English with technical depth. Conversational words, slang — ok."
+    return f"Natural {CONTENT_LANGUAGE} with technical depth. Conversational tone, slang — ok."
+
+
+def _lang_impersonal_example() -> str:
+    """Return language-appropriate impersonal writing example."""
+    lang = CONTENT_LANGUAGE.lower()
+    if "english" in lang:
+        return "'they shipped the model', 'interesting feature', 'looks like a breakthrough'"
+    return "«выкатили модель», «интересная фича», «похоже на прорыв»"
 
 
 # ---------------------------------------------------------------------------
@@ -213,11 +255,10 @@ def _make_writer(llm: LLM) -> Agent:
         ),
         backstory=(
             "Ты пишешь новостные посты для Telegram-канала об AI.\n\n"
-            "ГОЛОС — молодой, живой, как рассказываешь другу про крутую новинку:\n"
-            "• Разговорный русский. Не официальный, не переведённый.\n"
+            f"ГОЛОС — молодой, живой, как рассказываешь другу про крутую новинку:\n"
+            f"• Язык поста: {CONTENT_LANGUAGE}. Пиши ТОЛЬКО на этом языке.\n"
             "• Синтаксис простой: подлежащее → сказуемое.\n"
-            "• Сленг — обязательно там где уместен: «выкатили», «запустили», «прикрутили»,\n"
-            "  «зарелизили», «задеплоили», «набенчмаркали», «сбили бенчи у GPT-4».\n"
+            + _lang_slang_examples() +
             "• Эмоция — ТОЛЬКО фактическая: не «невероятно», а «за 2 секунды вместо 40».\n"
             "• ЗАПРЕЩЕНО добавлять в конце поста мнение, скептицизм или оценку:\n"
             "  — «посмотрим удастся ли», «а получится ли», «пока непонятно»\n"
@@ -512,7 +553,7 @@ def _write_task(agent: Agent, research_task: Task, post_type_name: str = "", pos
             "• НИКАКИХ «мне кажется», «я думаю», «я считаю».\n"
             "• НИКАКИХ «посмотрю», «потестирую», «покопаю», «расскажу».\n"
             "• Ты — не персонаж. Ты — lens, через которую читатель видит новость.\n"
-            "• Писать БЕЗЛИЧНО: «выкатили модель», «интересная фича», «похоже на прорыв».\n\n"
+            f"• Писать БЕЗЛИЧНО: {_lang_impersonal_example()}.\n\n"
             "ЗАПРЕЩЕНО (нарушение = брак):\n"
             "• Симулировать личный опыт: «я попробовал», «я тестировал».\n"
             "• Выдумывать планы: «буду тестировать», «надеюсь появится», «жду песочницу».\n"
@@ -551,8 +592,7 @@ def _write_task(agent: Agent, research_task: Task, post_type_name: str = "", pos
             "• «ссылаться на пост-источник» / «пост-источник» — служебная лексика\n\n"
             "═══ ГОЛОС ═══\n"
             "• Первая строка — факт, цифра, результат. Без предисловий.\n"
-            "• Одна мысль, которая развивается. Живой русский с технической начинкой. "
-            "Разговорные слова, сленг — ок.\n"
+            f"• Одна мысль, которая развивается. {_lang_voice_line()}\n"
             "• КОРОТКАЯ НОВОСТЬ (FACT_COUNT ≤ 3): пост 300-600 знаков, 1-2 абзаца.\n"
             "• БОГАТАЯ НОВОСТЬ (FACT_COUNT ≥ 6): пост 1000-2000 знаков, 3-5 абзацев.\n"
             "  Если оригинальный пост богат техническими деталями — не сжимай их.\n"

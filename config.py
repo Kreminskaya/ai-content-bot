@@ -31,6 +31,10 @@ USERBOT_SESSION: str = os.getenv("USERBOT_SESSION", "userbot.session")
 # Folder where Telethon downloads media attachments from posts
 MEDIA_DIR: str = os.getenv("MEDIA_DIR", "media")
 
+# --- Content language ---
+# Language for generated posts. Examples: "Russian", "English", "Spanish"
+CONTENT_LANGUAGE: str = os.getenv("CONTENT_LANGUAGE", "Russian")
+
 # --- Source files (change paths here if needed) ---
 SOURCES_FILE: str = "sources_telegram_channels.txt"
 STYLE_FILE: str = "my_true_voise.html"
