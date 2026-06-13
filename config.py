@@ -43,38 +43,40 @@ STYLE_FILE: str = "my_true_voise.html"
 FETCH_CUTOFF_HOURS: int = 48
 
 # --- RSS feeds to monitor ---
+# Add any RSS feed URLs relevant to your niche.
+# Examples for AI: https://openai.com/news/rss.xml, https://www.anthropic.com/rss.xml
+# Examples for fashion: https://www.vogue.com/feed/rss, https://hypebeast.com/feed
 RSS_SOURCES: list[str] = [
-    "https://huggingface.co/blog/feed.xml",
-    "https://openai.com/news/rss.xml",           # OpenAI News (canonical feed)
-    "https://openai.com/blog/rss.xml",            # OpenAI Blog (kept as fallback)
-    "https://www.anthropic.com/rss.xml",
-    "https://blog.google/technology/ai/rss/",
-    "https://www.deepmind.com/blog/rss.xml",
-    "https://www.marktechpost.com/feed/",         # MarkTechPost AI section
-    "https://venturebeat.com/category/ai/feed/",  # VentureBeat AI
-    "https://zernel.github.io/huggingface-trending-feed/feed.xml",  # HF Trending (unofficial)
+    # Add your RSS feeds here
 ]
 
 # --- Reddit subreddits to fetch via /new.json (no auth required) ---
+# Add subreddit names (without r/) relevant to your niche.
 REDDIT_SUBREDDITS: list[str] = [
-    "LocalLLaMA",        # локальные LLM, новые модели, бенчмарки
-    "singularity",       # крупные тренды и новости AI
-    "comfyui",           # ноды, воркфлоу, FaceSwap, апскейл
-    "aivideo",           # Kling, Runway, Sora, Seedance и др.
-    "StableDiffusion",   # open-source генерация изображений
-    "MachineLearning",   # серьёзный ML/AI ресёрч и релизы
+    # Add your subreddits here, e.g.: "MachineLearning", "fashion", "photography"
 ]
 
 # --- Web digest sites to scrape (HTML) ---
-# The Rundown AI, TLDR AI, Ben's Bites — ежедневные дайджесты
+# Add newsletter/digest sites to scrape for headlines.
 WEB_DIGEST_SOURCES: list[str] = [
-    "https://therundown.ai",
-    "https://tldr.tech/ai",
-    "https://bensbites.com",
+    # Add digest sites here, e.g.: "https://tldr.tech/ai"
 ]
 
-# --- Product Hunt AI topics (новые AI-инструменты) ---
-PRODUCT_HUNT_URL: str = "https://www.producthunt.com/topics/artificial-intelligence"
+# --- Product Hunt (optional) ---
+# Set to "" to disable Product Hunt fetching entirely
+PRODUCT_HUNT_URL: str = os.getenv("PRODUCT_HUNT_URL", "")
+
+# --- GitHub trending repos (optional) ---
+# Leave empty to disable. Add topic tags relevant to your niche.
+# Examples for AI: "machine-learning,llm,ai-agent"
+# Examples for fashion: "fashion,style,clothing"
+_gh_topics_env = os.getenv("GITHUB_TRENDING_TOPICS", "")
+GITHUB_TRENDING_TOPICS: list[str] = [t.strip() for t in _gh_topics_env.split(",") if t.strip()]
+
+# --- HuggingFace papers + models (optional) ---
+# Set to 0 to disable
+HUGGINGFACE_DAILY_PAPERS_LIMIT: int = int(os.getenv("HUGGINGFACE_DAILY_PAPERS_LIMIT", "0"))
+HUGGINGFACE_TRENDING_MODELS_LIMIT: int = int(os.getenv("HUGGINGFACE_TRENDING_MODELS_LIMIT", "0"))
 
 # --- Database ---
 DATABASE_PATH: str = "posts.db"
