@@ -56,7 +56,7 @@ Sources (Telegram / RSS / Reddit / HuggingFace / GitHub)
 - Python 3.10+
 - A Telegram Bot token (from [@BotFather](https://t.me/BotFather))
 - A Telegram API app (from [my.telegram.org](https://my.telegram.org)) — for the userbot that reads source channels
-- An LLM API key — Anthropic (Claude) or OpenAI
+- An LLM API key — DeepSeek, OpenAI, Qwen, Claude, or any OpenAI-compatible provider
 
 ### Installation
 
@@ -163,7 +163,7 @@ ai-content-bot/
 | Bot framework | [aiogram 3](https://docs.aiogram.dev) |
 | Telegram parsing | [Telethon](https://docs.telethon.dev) |
 | Multi-agent AI | [crewAI](https://crewai.com) |
-| LLM | Claude (Anthropic) / GPT (OpenAI) via [LiteLLM](https://litellm.ai) |
+| LLM | Any provider via [LiteLLM](https://litellm.ai) — DeepSeek, GPT-4, Qwen, Claude, etc. |
 | Scheduling | [APScheduler](https://apscheduler.readthedocs.io) |
 | HTTP | [httpx](https://www.python-httpx.org) |
 | HTML parsing | [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/) |
