@@ -103,20 +103,23 @@ def _is_recent(date_val, hours: int | None = None) -> bool:
 # Hard ad / promo filter
 # ---------------------------------------------------------------------------
 
+# Russian-language spam keywords — kept in Russian because that's the language
+# of the source posts this filter needs to match.
+# Add your own patterns here (in whatever language your sources use).
 _AD_PATTERNS = [
-    r"вебинар",
-    r"скидк[иа]",
-    r"переходи по ссылке в профиле",
-    r"записывайся",
-    r"мой курс",
+    r"вебинар",                    # webinar
+    r"скидк[иа]",                  # discount
+    r"переходи по ссылке в профиле",  # "click the link in bio"
+    r"записывайся",                # sign up / enroll
+    r"мой курс",                   # my course
     r"early\s*bird",
-    r"марафон",
-    r"консультаци[яи]",
-    r"платный доступ",
-    r"промокод",
-    r"успей купить",
-    r"регистрируйся",
-    r"бесплатный вебинар",
+    r"марафон",                    # marathon (online challenge)
+    r"консультаци[яи]",            # consultation
+    r"платный доступ",             # paid access
+    r"промокод",                   # promo code
+    r"успей купить",               # limited-time buy
+    r"регистрируйся",              # register now
+    r"бесплатный вебинар",         # free webinar
 ]
 
 _AD_RE = re.compile("|".join(_AD_PATTERNS), re.IGNORECASE)

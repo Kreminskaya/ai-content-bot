@@ -27,7 +27,7 @@ Output format (each post dict):
   {
     "channel":    str,           # @username of the source channel
     "message_id": int,
-    "text":       str,           # post body (or "[медиа без текста]")
+    "text":       str,           # post body (or "[media without text]")
     "date":       datetime,      # timezone-aware UTC datetime
     "media_path": str | None,    # absolute path to downloaded file, or None
     "link":       str,           # permanent t.me link
@@ -555,7 +555,7 @@ class TelethonFetcher:
                 if len(text) < _MIN_TEXT_LEN and not has_any_media:
                     continue
 
-                display_text = text if text else "[медиа без текста]"
+                display_text = text if text else "[media without text]"
 
                 # Download ALL media from all messages in the group
                 media_paths_fetched: list[str] = []

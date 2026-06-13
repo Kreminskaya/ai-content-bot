@@ -16,7 +16,7 @@ posts status lifecycle:
 digests status lifecycle:
   pending   → sent to admin as topic menu, waiting for clicks
   processed → at least one topic was sent to WriterCrew
-  rejected  → admin clicked "Отклонить всё"
+  rejected  → admin rejected all topics
 """
 
 import json

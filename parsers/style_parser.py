@@ -49,9 +49,9 @@ def build_style_prompt(html_file: str, max_examples: int = 6) -> str:
     sample = examples[:max_examples]
 
     header = (
-        "Ниже — примеры настоящих постов автора. "
-        "Пиши ТОЧНО в таком же стиле: живой, личный, с юмором, "
-        "от первого лица, с разговорными оборотами и авторскими интонациями.\n\n"
+        "Below are real posts by the channel author. "
+        "Write in EXACTLY the same style: lively, personal, with a touch of humor, "
+        "first-person voice, conversational phrasing, and the author's own intonation.\n\n"
     )
     body = "\n\n───────────────\n\n".join(sample)
     return header + body

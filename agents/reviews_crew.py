@@ -2,7 +2,7 @@
 ReviewsAgent — collects live user reviews for a digest topic.
 
 Runs BEFORE WriterCrew when admin clicks a topic button.
-Results are passed to Researcher as "Что говорят пользователи" section.
+Results are passed to Researcher as a "User reviews" context section.
 
 Data sources (all public, no auth required):
   1. Reddit search — /search.json across key AI subreddits
@@ -64,12 +64,12 @@ def _extract_keywords(title: str) -> str:
     Extract the most meaningful search term from a digest topic title.
     Strips common filler words and returns 2–4 key tokens.
 
-    Examples:
+    Examples (RU titles are supported alongside EN titles):
       "Runway выпустил инструмент автоматического монтажа" → "Runway автомонтаж"
       "Gemini 2.5 Pro — лучший по бенчмаркам" → "Gemini 2.5 Pro"
       "ComfyUI новый нод для LoRA" → "ComfyUI LoRA"
     """
-    # Remove common Russian filler words
+    # Russian filler words stripped when topic titles are in Russian
     STOP_RU = {
         "выпустил", "выпустила", "анонсировал", "анонсировала", "запустил",
         "представил", "обновил", "добавил", "теперь", "новый", "новая", "новое",

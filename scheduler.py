@@ -1,5 +1,5 @@
 """
-APScheduler: runs the "Воронка" pipeline once or twice a day.
+APScheduler: runs the digest pipeline once or twice a day.
 
 Pipeline steps (new architecture):
   1. Fetch posts from ALL sources:
@@ -10,7 +10,7 @@ Pipeline steps (new architecture):
   3. Run DigestCrew (Analyst agent):
        → JSON digest with Top-5 Hard News + Top-5 Useful topics
   4. Save digest to SQLite with status = 'pending'
-  5. Send "📰 Дайджест за [Дата]" to admin with 10 topic buttons
+  5. Send digest menu to admin with topic buttons
 
 When admin clicks a topic button (handled in bot/handlers.py):
   6. WriterCrew generates 3 post variants for the chosen topic
@@ -38,15 +38,15 @@ def _friendly_llm_error(exc: Exception) -> str:
     lowered = raw.lower()
     if "usage limits" in lowered or "rate limit" in lowered or "429" in lowered:
         return (
-            "❌ Лимит LLM-провайдера исчерпан. "
-            "Автодайджест временно остановлен, пока не сменим ключ/модель."
+            "❌ LLM provider limit reached. "
+            "Auto-digest paused — switch the model or key to resume."
         )
     if "invalid_request_error" in lowered and "api usage limits" in lowered:
         return (
-            "❌ Anthropic временно недоступен из-за лимита. "
-            "Автодайджест будет восстановлен после переключения на резервную модель."
+            "❌ LLM provider temporarily unavailable (quota). "
+            "Auto-digest will resume after switching to a fallback model."
         )
-    return f"❌ Ошибка DigestCrew:\n<code>{raw}</code>"
+    return f"❌ DigestCrew error:\n<code>{raw}</code>"
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ _PIPELINE_TIMEOUT = 600  # 10 minutes max per run
 
 
 async def run_pipeline_job(bot: Bot) -> None:
-    """Execute the full Воронка pipeline end-to-end (with timeout guard)."""
+    """Execute the full digest pipeline end-to-end (with timeout guard)."""
     try:
         await asyncio.wait_for(_run_pipeline(bot), timeout=_PIPELINE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -65,7 +65,7 @@ async def run_pipeline_job(bot: Bot) -> None:
         try:
             await bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text="⚠️ Пайплайн завис и был принудительно остановлен (таймаут 10 мин).",
+                text="⚠️ Pipeline timed out and was force-stopped (10 min limit).",
             )
         except Exception:
             pass
@@ -73,7 +73,7 @@ async def run_pipeline_job(bot: Bot) -> None:
 
 async def _run_pipeline(bot: Bot) -> None:
     """Actual pipeline logic."""
-    logger.info("Pipeline started (Воронка architecture)")
+    logger.info("Pipeline started")
 
     # 1. Fetch from all sources (Telegram + RSS + Reddit)
     raw_items = await fetch_all_sources(SOURCES_FILE)
@@ -81,7 +81,7 @@ async def _run_pipeline(bot: Bot) -> None:
         logger.warning("No news items fetched — skipping this run")
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text="⚠️ Пайплайн: не удалось получить новости ни из одного источника.",
+            text="⚠️ Pipeline: could not fetch news from any source.",
         )
         return
 
@@ -94,8 +94,8 @@ async def _run_pipeline(bot: Bot) -> None:
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=(
-                f"⚠️ Пайплайн: собрали {len(raw_items)} постов, "
-                "но все были отфильтрованы жёстким фильтром."
+                f"⚠️ Pipeline: fetched {len(raw_items)} posts "
+                "but all were filtered out by the ad/spam filter."
             ),
         )
         return
@@ -123,7 +123,7 @@ async def _run_pipeline(bot: Bot) -> None:
         logger.error("DigestCrew produced no topics — aborting")
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text="⚠️ Аналитик не нашёл достойных тем. Проверь логи.",
+            text="⚠️ Analyst found no topics worth publishing. Check the logs.",
         )
         return
 
@@ -182,8 +182,8 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
         id="daily_pipeline",
         replace_existing=True,
         misfire_grace_time=300,
-        coalesce=True,       # если пропустили несколько запусков — выполнить только один
-        max_instances=1,     # явно: не запускать параллельно
+        coalesce=True,       # if multiple runs were missed — execute only one
+        max_instances=1,     # never run two pipeline instances in parallel
     )
 
     logger.info(
