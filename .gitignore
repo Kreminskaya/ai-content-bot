@@ -1,0 +1,109 @@
+# ── Secrets & credentials ───────────────────────────────────────────────────
+.env
+*.session
+userbot.session
+
+# ── Database ─────────────────────────────────────────────────────────────────
+posts.db
+*.db-shm
+*.db-wal
+
+# ── Media cache ──────────────────────────────────────────────────────────────
+media/
+
+# ── Logs & output ────────────────────────────────────────────────────────────
+*.log
+bot_output.log
+out.txt
+check_output.txt
+deploy_log_*.txt
+deploy_out.txt
+deploy_output*.txt
+deploy_result.txt
+pipeline_test.log
+server_*.txt
+local_llm_state.txt
+test_architect_ok.txt
+
+# ── Your source list (contains personal channel subscriptions) ───────────────
+sources_telegram_channels.txt
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── Claude AI internal files ──────────────────────────────────────────────────
+.claude/
+memory-bank/
+
+# ── Temp & junk ──────────────────────────────────────────────────────────────
+*.zip
+*.pdf
+nul
+$null
+rg.zip
+repo_info.json
+
+# ── Personal voice/style files ───────────────────────────────────────────────
+agents/natalie_voice_reference.md
+bot/writer-skill.md
+bot/handlers.py.bak
+
+# ── Internal planning docs (not for public) ──────────────────────────────────
+ARCHITECTURE_RULES.md
+AUDIT_REPORT.md
+CURRENT_STATE.md
+PROJECT_MAP.md
+SPEC_pipeline_quality.md
+TASK_HANDOFF.md
+TZ_FIX_ALL.md
+plans/
+skills/
+memory-bank/
+
+# ── Dev/deploy scripts with credentials ──────────────────────────────────────
+deploy/server_credentials.txt
+deploy_to_server.py
+update_code.py
+update_service.py
+poll_server.py
+run_deploy.py
+finish_deploy.py
+finish_deploy2.py
+deploy_fix.py
+
+# ── One-off scripts ──────────────────────────────────────────────────────────
+_test_cleanup.py
+check_jobs.py
+check_server.py
+check_status.py
+check_telethon.py
+fix_telethon_session.py
+generate_portfolio_pdf.py
+create_kanban.py
+create_kanban2.py
+remove-openclaw-task.bat
+my_true_voise.html
+hermes_install.sh
+hermes_pyproject.toml
+hermes_setup.sh
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.roo/
+.roomodes
+.idea/
+.vscode/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride

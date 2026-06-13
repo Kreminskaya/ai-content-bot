@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Telegram Assistant Bot
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ai-telegram-assistant
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ai-telegram-assistant/venv/bin/python main.py
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
