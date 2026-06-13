@@ -1,14 +1,14 @@
 #!/bin/bash
 # =================================================================
-#  setup.sh — установка AI Telegram Bot на Ubuntu 24.04
-#  Запускать от root:
+#  setup.sh — install AI Content Bot on Ubuntu 24.04
+#  Run as root:
 #    bash /opt/ai-telegram-assistant/deploy/setup.sh
 # =================================================================
 
-# Убрать Windows-переносы строк из самого скрипта (на случай scp с Windows)
+# Strip Windows line endings if the script was transferred from Windows
 sed -i 's/\r//' "$0"
 
-set -e  # остановиться при любой ошибке
+set -e  # stop on any error
 
 APP_DIR="/opt/ai-telegram-assistant"
 SERVICE_NAME="ai-telegram-bot"
@@ -17,52 +17,51 @@ SERVICE_DST="/etc/systemd/system/${SERVICE_NAME}.service"
 
 echo ""
 echo "┌──────────────────────────────────────────┐"
-echo "│   AI Telegram Bot — установка на сервер  │"
+echo "│   AI Content Bot — server installation   │"
 echo "└──────────────────────────────────────────┘"
 echo ""
 
-# 1. Системные пакеты
-echo "[1/6] Обновление системы и установка Python..."
+# 1. System packages
+echo "[1/6] Updating system and installing Python..."
 apt-get update -q
 apt-get install -y python3 python3-pip python3-venv
 
-# 2. Виртуальное окружение (пересоздаём если повреждено)
-echo "[2/6] Создание virtualenv..."
+# 2. Virtual environment (recreate if broken)
+echo "[2/6] Creating virtualenv..."
 cd "$APP_DIR"
 python3 -m venv venv
 
-# 3. Зависимости (без --quiet чтобы видеть ошибки)
-echo "[3/6] Установка зависимостей Python (2-3 минуты)..."
+# 3. Python dependencies
+echo "[3/6] Installing Python dependencies (2-3 minutes)..."
 "$APP_DIR/venv/bin/pip" install --upgrade pip
 "$APP_DIR/venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 
-# 4. Папка для медиафайлов
-echo "[4/6] Создание папки media/..."
+# 4. Media folder
+echo "[4/6] Creating media/ directory..."
 mkdir -p "$APP_DIR/media"
 
-# 5. Systemd-сервис
-echo "[5/6] Установка systemd-сервиса..."
-# Убрать Windows-переносы строк из service-файла
+# 5. Systemd service
+echo "[5/6] Installing systemd service..."
+# Strip Windows line endings from the service file
 sed -i 's/\r//' "$SERVICE_SRC"
-# Скопировать в системную папку
 cp "$SERVICE_SRC" "$SERVICE_DST"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
-# 6. Итог
+# 6. Done
 echo ""
-echo "✅ [6/6] Установка завершена!"
+echo "✅ [6/6] Installation complete!"
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  Теперь выполни по порядку:"
+echo "  Next steps:"
 echo ""
-echo "  1. Авторизуй Telethon (один раз):"
+echo "  1. Authorise the Telethon userbot (one time only):"
 echo "       cd $APP_DIR && venv/bin/python auth_userbot.py"
-echo "     → введи код из Telegram → дождись 'Session saved'"
+echo "     → enter the code from Telegram → wait for 'Session saved'"
 echo ""
-echo "  2. Запусти бота:"
+echo "  2. Start the bot:"
 echo "       systemctl start $SERVICE_NAME"
 echo ""
-echo "  3. Проверь логи:"
+echo "  3. Check the logs:"
 echo "       journalctl -u $SERVICE_NAME -f"
 echo "═══════════════════════════════════════════════════════"
