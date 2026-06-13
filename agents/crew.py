@@ -46,6 +46,7 @@ from config import (
     OPENAI_API_KEY,
     OPENROUTER_API_KEY,
 )
+from bot.i18n import content_language_name
 
 logger = logging.getLogger(__name__)
 
@@ -73,36 +74,36 @@ def _llm_key() -> str:
 
 def _lang_slang_examples() -> str:
     """Return language-appropriate slang examples for the writer prompt."""
-    lang = CONTENT_LANGUAGE.lower()
+    lang = content_language_name().lower()
     if "russian" in lang or "русск" in lang:
         return (
             "• Сленг — обязательно там где уместен: «выкатили», «запустили», «прикрутили»,\n"
-            "  «зарелизили», «задеплоили», «набенчмаркали», «сбили бенчи у GPT-4».\n"
+            "  «зарелизили», «задеплоили», «анонсировали», «обновили».\n"
         )
     if "english" in lang:
         return (
             "• Slang — use it where it fits: 'shipped', 'dropped', 'rolled out',\n"
-            "  'went live', 'crushed the benchmarks', 'blew GPT-4 out of the water'.\n"
+            "  'went live', 'launched', 'announced', 'updated'.\n"
         )
     return (
-        f"• Use natural, conversational {CONTENT_LANGUAGE} slang where it fits.\n"
+        f"• Use natural, conversational {content_language_name()} slang where it fits.\n"
         "  Prefer active verbs: launched, shipped, released, deployed.\n"
     )
 
 
 def _lang_voice_line() -> str:
     """Return language-appropriate voice description line."""
-    lang = CONTENT_LANGUAGE.lower()
+    lang = content_language_name().lower()
     if "russian" in lang or "русск" in lang:
         return "Живой русский с технической начинкой. Разговорные слова, сленг — ок."
     if "english" in lang:
         return "Punchy English with technical depth. Conversational words, slang — ok."
-    return f"Natural {CONTENT_LANGUAGE} with technical depth. Conversational tone, slang — ok."
+    return f"Natural {content_language_name()} with technical depth. Conversational tone, slang — ok."
 
 
 def _lang_impersonal_example() -> str:
     """Return language-appropriate impersonal writing example."""
-    lang = CONTENT_LANGUAGE.lower()
+    lang = content_language_name().lower()
     if "english" in lang:
         return "'they shipped the model', 'interesting feature', 'looks like a breakthrough'"
     return "«выкатили модель», «интересная фича», «похоже на прорыв»"
@@ -141,6 +142,12 @@ def _llm(temperature: float = 0.7) -> LLM:
 # POST TYPE TAXONOMY — pre-generation diversity
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# CUSTOMIZE FOR YOUR NICHE: post type taxonomy used by the Writer agent.
+# Each type defines a narrative angle for the generated post.
+# The descriptions below are tuned for an AI/tech channel — adapt the wording
+# to fit your channel's voice and subject matter.
+# ---------------------------------------------------------------------------
 POST_TYPE_TAXONOMY = {
     "hot_take": {
         "name": "🔥 Hot Take",
@@ -180,8 +187,8 @@ POST_TYPE_TAXONOMY = {
     "analogy": {
         "name": "🎭 Аналогия",
         "description": (
-            "Объяснить AI-разработку через аналогию из другой области. "
-            "Структура: Аналогия → Карта на AI → Следствие."
+            "Объяснить тему через аналогию из другой области. "
+            "Структура: Аналогия → Карта на тему → Следствие."
         )
     },
     "comparison": {
@@ -194,7 +201,7 @@ POST_TYPE_TAXONOMY = {
     "practical_guide": {
         "name": "🛠️ Практика",
         "description": (
-            "Как это использовать. Конкретные шаги, промпты, примеры. "
+            "Как это использовать. Конкретные шаги, примеры. "
             "Структура: Задача → Инструмент/подход → Пошагово."
         )
     },
@@ -244,19 +251,22 @@ def _make_researcher(llm: LLM) -> Agent:
     )
 
 
+# CUSTOMIZE FOR YOUR NICHE: the Writer agent backstory below is tuned for an AI/tech
+# news channel. If you run a different kind of channel (fashion, finance, sports, etc.),
+# update the role, the niche terminology list, and headline examples to match your topic.
 def _make_writer(llm: LLM) -> Agent:
     """Writer uses temperature=0.5 — balance of facts and voice."""
     return Agent(
-        role="Редактор новостного AI-канала",
+        role="Редактор новостного Telegram-канала",
         goal=(
             "Написать пост, который содержит ВСЕ факты из FACT BLOCK. "
             "Ни один факт не теряется. Ничего не выдумывать. "
             "Живой голос, не пресс-релиз. КАТЕГОРИЧЕСКИ без первого лица."
         ),
         backstory=(
-            "Ты пишешь новостные посты для Telegram-канала об AI.\n\n"
+            "Ты пишешь новостные посты для Telegram-канала.\n\n"
             f"ГОЛОС — молодой, живой, как рассказываешь другу про крутую новинку:\n"
-            f"• Язык поста: {CONTENT_LANGUAGE}. Пиши ТОЛЬКО на этом языке.\n"
+            f"• Язык поста: {content_language_name()}. Пиши ТОЛЬКО на этом языке.\n"
             "• Синтаксис простой: подлежащее → сказуемое.\n"
             + _lang_slang_examples() +
             "• Эмоция — ТОЛЬКО фактическая: не «невероятно», а «за 2 секунды вместо 40».\n"
@@ -265,25 +275,20 @@ def _make_writer(llm: LLM) -> Agent:
             "  — «неизвестно взлетит ли», «конкуренты не дремлют», «рынок ответит»\n"
             "  — «остаётся только ждать», «поживём — увидим», «что ж посмотрим»\n"
             "  Концовка поста = последний ФАКТ. Не мнение. Не предсказание.\n\n"
-            "ТЕХНИЧЕСКИЕ ДАННЫЕ — ОБЯЗАТЕЛЬНЫ:\n"
-            "• Если в FACT BLOCK есть бенчмарки, цифры, миллисекунды, сравнения с другими\n"
-            "  моделями — ВСЁ это должно быть в посте. Это и есть главная ценность.\n"
+            "КОНКРЕТНЫЕ ДАННЫЕ — ОБЯЗАТЕЛЬНЫ:\n"
+            "• Если в FACT BLOCK есть числа, даты, характеристики, сравнения —\n"
+            "  ВСЁ это должно быть в посте. Это и есть главная ценность.\n"
             "• Числа, версии, параметры — дословно из FACT BLOCK, не округляй и не выкидывай.\n"
-            "• Сравнения с конкурентами (быстрее GPT-4 в 3x, дешевле Claude на 40%) — СОХРАНЯЙ.\n\n"
-            "ТЕРМИНЫ — инженерный вайб, не пересказ для бабушки:\n"
-            "• Используй термины сообщества: липсинк, лора, файнтюн, чекпоинт, апскейл,\n"
-            "  воркфлоу, инпейнтинг, промпт, инференс, контекстное окно, рэг, агент.\n"
-            "• Можно транслит (липсинк) или английский (LoRA) — по ситуации.\n"
-            "• НЕЛЬЗЯ заменять термины описанием: «липсинк» ≠ «синхронизация движения губ».\n"
-            "• Названия моделей, инструментов, сервисов — ТОЧНО как в источнике.\n\n"
+            "• Сравнения с конкурентами — СОХРАНЯЙ.\n\n"
+            "ТЕРМИНЫ — профессиональный вайб, не пересказ для неспециалиста:\n"
+            "• Используй термины своего сообщества — профессиональный сленг ниши приветствуется.\n"
+            "• Названия продуктов, инструментов, брендов — ТОЧНО как в источнике.\n\n"
             "ЗАГОЛОВОК — факт, не продажа:\n"
-            "• Что произошло — прямо. Без «революционный», «невероятный», «впервые в истории».\n"
-            "• ✅ «DeepSeek V3 — 671B params, бьёт GPT-4 на 12 из 15 бенчей, открытые веса»\n"
-            "• ❌ «DeepSeek совершил прорыв который изменит всё»\n\n"
+            "• Что произошло — прямо. Без «революционный», «невероятный», «впервые в истории».\n\n"
             "КАТЕГОРИЧЕСКИЙ ЗАПРЕТ: не писать от первого лица. "
             "Никаких «я», «мне», «мой», «буду», «попробовал», «тестировал». "
             "Ты — голос канала, не персонаж.\n\n"
-            "Ссылки вплетай в текст: «выложили на GitHub», «модель на HuggingFace». "
+            "Ссылки вплетай в текст органично. "
             "Никаких «Ссылка:», «Источник:», «Попробовать:»."
         ),
         skills=["./skills/publishing-rules"],

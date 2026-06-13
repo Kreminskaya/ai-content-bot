@@ -31,9 +31,38 @@ USERBOT_SESSION: str = os.getenv("USERBOT_SESSION", "userbot.session")
 # Folder where Telethon downloads media attachments from posts
 MEDIA_DIR: str = os.getenv("MEDIA_DIR", "media")
 
-# --- Content language ---
-# Language for generated posts. Examples: "Russian", "English", "Spanish"
-CONTENT_LANGUAGE: str = os.getenv("CONTENT_LANGUAGE", "Russian")
+# --- Interface & content language ---
+# Initial default language for the whole bot (UI + generated content).
+# Accepts "ru"/"en" or "Russian"/"English". Users switch it live via /language;
+# the choice is remembered in runtime_state.json. See bot/i18n.py.
+LANGUAGE: str = os.getenv("LANGUAGE", os.getenv("CONTENT_LANGUAGE", "ru"))
+# Legacy alias, still read by older code paths.
+CONTENT_LANGUAGE: str = os.getenv("CONTENT_LANGUAGE", LANGUAGE)
+
+# --- Category tags (stable internal identifiers, NOT translated) ---
+# Enum-like routing keys: the analyst emits them, handlers route on them.
+# The user never sees the raw tag — only an emoji + the localized section header
+# (bot/i18n.py) + the topic title (written in the chosen language).
+# English tags (used when the analyst runs in English)
+CATEGORY_VISUAL     = "Visual & Production"
+CATEGORY_LLM        = "AI & LLM"
+CATEGORY_SERVICES   = "Useful Tools"
+CATEGORY_ROBOTICS   = "Robots & Hardware"
+CATEGORY_PRODUCTION = "Production Cases"
+
+# Russian tags (used when the analyst runs in Russian) — original taxonomy.
+CATEGORY_VISUAL_RU     = "Визуал и Продакшен"
+CATEGORY_LLM_RU        = "Мозги и LLM"
+CATEGORY_SERVICES_RU   = "Полезные сервисы"
+CATEGORY_ROBOTICS_RU   = "Роботы и железо"
+CATEGORY_PRODUCTION_RU = "Кейс-истории продакшена"
+
+# Groups are language-agnostic UNIONS: handlers route correctly whether the
+# analyst emitted Russian or English category tags.
+HARD_CATEGORIES     = {CATEGORY_VISUAL, CATEGORY_LLM, CATEGORY_VISUAL_RU, CATEGORY_LLM_RU}
+USEFUL_CATEGORIES   = {CATEGORY_SERVICES, CATEGORY_ROBOTICS, CATEGORY_SERVICES_RU, CATEGORY_ROBOTICS_RU}
+PRODUCTION_CATEGORY = {CATEGORY_PRODUCTION, CATEGORY_PRODUCTION_RU}
+ALL_CATEGORIES      = HARD_CATEGORIES | USEFUL_CATEGORIES | PRODUCTION_CATEGORY
 
 # --- Source files (change paths here if needed) ---
 SOURCES_FILE: str = "sources_telegram_channels.txt"

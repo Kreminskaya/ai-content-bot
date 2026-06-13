@@ -8,6 +8,9 @@ posts.db
 *.db-shm
 *.db-wal
 
+# ── Runtime state (remembered UI language, etc.) ─────────────────────────────
+runtime_state.json
+
 # ── Media cache ──────────────────────────────────────────────────────────────
 media/
 

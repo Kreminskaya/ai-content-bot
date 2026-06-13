@@ -140,7 +140,13 @@ def _html_to_entities(text: str, extra_entities: list[dict] | None = None) -> tu
 
     return plain_text, entities
 
-from config import ADMIN_CHAT_ID, TARGET_CHANNEL_ID
+from config import (
+    ADMIN_CHAT_ID, TARGET_CHANNEL_ID,
+    CATEGORY_VISUAL, CATEGORY_LLM, CATEGORY_SERVICES, CATEGORY_ROBOTICS, CATEGORY_PRODUCTION,
+    CATEGORY_VISUAL_RU, CATEGORY_LLM_RU, CATEGORY_SERVICES_RU, CATEGORY_ROBOTICS_RU, CATEGORY_PRODUCTION_RU,
+    HARD_CATEGORIES, USEFUL_CATEGORIES, PRODUCTION_CATEGORY,
+)
+from bot import i18n
 from bot.trail import trail_append, is_used
 from database.models import (
     create_post,
@@ -173,16 +179,10 @@ def _friendly_llm_error(exc: Exception) -> str:
     raw = str(exc)
     lowered = raw.lower()
     if "usage limits" in lowered or "rate limit" in lowered or "429" in lowered:
-        return (
-            "❌ Лимит LLM-провайдера исчерпан.\n"
-            "Нужно переключить модель/ключ или дождаться сброса лимита."
-        )
+        return i18n.t("llm_limit")
     if "invalid_request_error" in lowered and "api usage limits" in lowered:
-        return (
-            "❌ Лимит LLM-провайдера исчерпан.\n"
-            "Anthropic сейчас недоступен для генерации. Переключаемся на резервную модель."
-        )
-    return f"❌ Ошибка при написании поста:\n<code>{raw}</code>"
+        return i18n.t("llm_limit_fallback")
+    return i18n.t("writing_error", err=raw)
 
 
 # ---------------------------------------------------------------------------
@@ -342,11 +342,16 @@ class ManualPostState(StatesGroup):
 # ---------------------------------------------------------------------------
 
 _CATEGORY_EMOJI = {
-    "Визуал и Продакшен":      "🎨",
-    "Мозги и LLM":             "🧠",
-    "Полезные сервисы":        "🛠",
-    "Промпты и лайфхаки":      "💡",
-    "Кейс-истории продакшена": "🎬",
+    CATEGORY_VISUAL:        "🎨",
+    CATEGORY_LLM:           "🧠",
+    CATEGORY_SERVICES:      "🛠",
+    CATEGORY_ROBOTICS:      "🤖",
+    CATEGORY_PRODUCTION:    "🎬",
+    CATEGORY_VISUAL_RU:     "🎨",
+    CATEGORY_LLM_RU:        "🧠",
+    CATEGORY_SERVICES_RU:   "🛠",
+    CATEGORY_ROBOTICS_RU:   "🤖",
+    CATEGORY_PRODUCTION_RU: "🎬",
 }
 
 
@@ -362,7 +367,7 @@ def digest_keyboard(digest_id: int, topics: list[dict]) -> InlineKeyboardMarkup:
         idx = topic.get("index", 0)
         category = topic.get("category", "")
         emoji = _CATEGORY_EMOJI.get(category, "📌")
-        title = topic.get("title", f"Тема {idx}")
+        title = topic.get("title", i18n.t("topic_fallback", idx=idx))
         # Truncate button label to fit Telegram's 64-char limit
         label = f"{emoji} {title}"
         if len(label) > 60:
@@ -377,7 +382,7 @@ def digest_keyboard(digest_id: int, topics: list[dict]) -> InlineKeyboardMarkup:
 
     rows.append([
         InlineKeyboardButton(
-            text="❌ Отклонить всё",
+            text=i18n.t("btn_reject_all"),
             callback_data=f"digest:reject:{digest_id}",
         )
     ])
@@ -399,18 +404,18 @@ def post_keyboard(post_id: int, has_image_prompt: bool = False) -> InlineKeyboar
 
     rows.append([
         InlineKeyboardButton(
-            text="✅ Постить",
+            text=i18n.t("btn_publish"),
             callback_data=f"post:pub:{post_id}:0",
         ),
         InlineKeyboardButton(
-            text="✏️ Редактировать",
+            text=i18n.t("btn_edit"),
             callback_data=f"post:edit:{post_id}",
         ),
     ])
 
     row2 = [
         InlineKeyboardButton(
-            text="❌ Отмена",
+            text=i18n.t("btn_cancel"),
             callback_data=f"post:reject:{post_id}",
         )
     ]
@@ -422,11 +427,11 @@ def post_keyboard(post_id: int, has_image_prompt: bool = False) -> InlineKeyboar
 def confirm_keyboard(post_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="✅ Опубликовать",
+            text=i18n.t("btn_publish"),
             callback_data=f"post:confirm:{post_id}",
         ),
         InlineKeyboardButton(
-            text="❌ Отмена",
+            text=i18n.t("btn_cancel"),
             callback_data=f"post:cancel_edit:{post_id}",
         ),
     ]])
@@ -436,11 +441,11 @@ def _edit_publish_keyboard(post_id: int) -> InlineKeyboardMarkup:
     """Edit-flow keyboard with consistent 'Постить' label."""
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="✅ Постить",
+            text=i18n.t("btn_publish"),
             callback_data=f"post:confirm:{post_id}",
         ),
         InlineKeyboardButton(
-            text="❌ Отмена",
+            text=i18n.t("btn_cancel"),
             callback_data=f"post:cancel_edit:{post_id}",
         ),
     ]])
@@ -466,15 +471,15 @@ async def send_digest_to_admin(bot: Bot, digest_id: int) -> None:
         return
 
     date = digest.get("date", "")
-    lines: list[str] = [f"📰 <b>Дайджест за {date}</b>\n"]
+    lines: list[str] = [i18n.t("digest_header", date=date) + "\n"]
 
     # Split topics into sections by category
-    hard       = [t for t in topics if t.get("category") in ("Визуал и Продакшен", "Мозги и LLM")]
-    production = [t for t in topics if t.get("category") == "Кейс-истории продакшена"]
-    useful     = [t for t in topics if t.get("category") in ("Полезные сервисы", "Промпты и лайфхаки")]
+    hard       = [t for t in topics if t.get("category") in HARD_CATEGORIES]
+    production = [t for t in topics if t.get("category") == CATEGORY_PRODUCTION]
+    useful     = [t for t in topics if t.get("category") in USEFUL_CATEGORIES]
 
     if hard:
-        lines.append("<b>── 🧠 Хард-Новости ──</b>")
+        lines.append(i18n.t("section_hard"))
         for t in hard:
             emoji = _CATEGORY_EMOJI.get(t.get("category", ""), "📌")
             lines.append(
@@ -483,7 +488,7 @@ async def send_digest_to_admin(bot: Bot, digest_id: int) -> None:
             )
 
     if production:
-        lines.append("\n<b>── 🎬 Кейсы Продакшена ──</b>")
+        lines.append("\n" + i18n.t("section_production"))
         for t in production:
             lines.append(
                 f"🎬 <b>{t.get('index')}. {t.get('title', '')}</b>\n"
@@ -491,7 +496,7 @@ async def send_digest_to_admin(bot: Bot, digest_id: int) -> None:
             )
 
     if useful:
-        lines.append("\n<b>── 🛠 Полезности ──</b>")
+        lines.append("\n" + i18n.t("section_useful"))
         for t in useful:
             emoji = _CATEGORY_EMOJI.get(t.get("category", ""), "📌")
             lines.append(
@@ -500,7 +505,7 @@ async def send_digest_to_admin(bot: Bot, digest_id: int) -> None:
             )
 
     total = len(topics)
-    lines.append(f"\n<i>👆 Нажми на тему, чтобы написать пост ({total} тем)</i>")
+    lines.append("\n<i>" + i18n.t("digest_footer", n=total) + "</i>")
     text = "\n\n".join(lines)
 
     msg = await bot.send_message(
@@ -550,7 +555,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
 
     # ── Send media with caption if text ≤ 1024, otherwise separate ───────────
     if media_paths_all:
-        caption_text = f"📝 <b>Черновик #{post_id}:</b>\n\n{post_text}"
+        caption_text = i18n.t("draft_label", id=post_id) + f"\n\n{post_text}"
         if len(post_text) <= 1024:
             # Case 1: Short text + media → media group with caption
             try:
@@ -562,7 +567,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
                 if len(media_paths_all) > 1:
                     await bot.send_message(
                         chat_id=ADMIN_CHAT_ID,
-                        text=f"📝 <b>Черновик #{post_id}:</b> кнопки ниже",
+                        text=i18n.t("draft_buttons_below", id=post_id),
                         parse_mode="HTML",
                         reply_markup=keyboard,
                     )
@@ -571,7 +576,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
                     # send_photo/video doesn't auto-attach keyboard here; send separately
                     await bot.send_message(
                         chat_id=ADMIN_CHAT_ID,
-                        text=f"⬆️ Черновик #{post_id}",
+                        text=i18n.t("draft_up", id=post_id),
                         parse_mode="HTML",
                         reply_markup=keyboard,
                     )
@@ -610,7 +615,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
         try:
             msg = await bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"📝 <b>Черновик #{post_id}:</b>\n\n{post_text}",
+                text=i18n.t("draft_label", id=post_id) + f"\n\n{post_text}",
                 reply_markup=keyboard,
                 parse_mode="HTML",
             )
@@ -623,7 +628,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
             safe_text = re.sub(r"<[^>]+>", "", post_text)
             msg = await bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"📝 <b>Черновик #{post_id}:</b>\n\n{safe_text}",
+                text=i18n.t("draft_label", id=post_id) + f"\n\n{safe_text}",
                 reply_markup=keyboard,
                 parse_mode="HTML",
             )
@@ -636,7 +641,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
             try:
                 msg = await bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"📝 <b>Черновик #{post_id}:</b>\n\n{parts[0]}",
+                    text=i18n.t("draft_label", id=post_id) + f"\n\n{parts[0]}",
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
@@ -648,7 +653,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
                 safe_text = re.sub(r"<[^>]+>", "", parts[0])
                 msg = await bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"📝 <b>Черновик #{post_id}:</b>\n\n{safe_text}",
+                    text=i18n.t("draft_label", id=post_id) + f"\n\n{safe_text}",
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
@@ -659,7 +664,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
             try:
                 msg = await bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"📝 <b>Черновик #{post_id} (часть 1/{len(parts)}):</b>\n\n{parts[0]}",
+                    text=i18n.t("draft_part", id=post_id, n=1, total=len(parts)) + f"\n\n{parts[0]}",
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
@@ -671,7 +676,7 @@ async def send_post_to_admin(bot: Bot, post_id: int) -> None:
                 safe_text = re.sub(r"<[^>]+>", "", parts[0])
                 msg = await bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"📝 <b>Черновик #{post_id} (часть 1/{len(parts)}):</b>\n\n{safe_text}",
+                    text=i18n.t("draft_part", id=post_id, n=1, total=len(parts)) + f"\n\n{safe_text}",
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
@@ -855,12 +860,12 @@ async def _publish(
             )
             update_status(post_id, "published", final_text=text)
             _delete_media_file(media_path)
-            await call.answer("Опубликовано!")
+            await call.answer(i18n.t("post_published_toast"))
             _cid = f"telegram:chat:{ADMIN_CHAT_ID}:message:{call.message.message_id}"
             trail_append(action="edit", content_id=_cid, params={"post_id": post_id})
             try:
                 await call.message.edit_text(
-                    f"✅ <b>Пост #{post_id} опубликован в канале!</b>\n\n"
+                    i18n.t("post_published_full", id=post_id) + "\n\n" + 
                     f"{text[:400]}{'…' if len(text) > 400 else ''}",
                     reply_markup=None,
                 )
@@ -1058,21 +1063,21 @@ async def _publish(
     except Exception as exc:
         logger.exception("Failed to publish post #%s: %s", post_id, exc)
         update_status(post_id, "error")
-        await call.answer(f"Ошибка: {exc}", show_alert=True)
+        await call.answer(i18n.t("error_generic_toast", err=exc), show_alert=True)
         return
 
     # Confirm to admin — separate try so a failed edit never undoes the publish
-    await call.answer("Опубликовано!")
+    await call.answer(i18n.t("post_published_toast"))
     try:
         if entity_objs and len(text) <= 4096:
             await call.message.edit_text(  # type: ignore[union-attr]
-                f"✅ <b>Пост #{post_id} опубликован в канале!</b>\n\n"
+                i18n.t("post_published_full", id=post_id) + "\n\n" + 
                 f"{text[:400]}{'…' if len(text) > 400 else ''}",
                 reply_markup=None,
             )
         else:
             await call.message.edit_text(  # type: ignore[union-attr]
-                f"✅ <b>Пост #{post_id} опубликован в канале!</b>\n\n"
+                i18n.t("post_published_full", id=post_id) + "\n\n" + 
                 f"<i>{text[:400]}{'…' if len(text) > 400 else ''}</i>",
                 reply_markup=None,
                 parse_mode="HTML",
@@ -1088,16 +1093,7 @@ async def _publish(
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        "👋 Привет! Я твой AI-редактор для Telegram-канала.\n\n"
-        "<b>Команды:</b>\n"
-        "/run — запустить дайджест-пайплайн вручную\n"
-        "/post — ✍️ написать пост по своей новости\n"
-        "/status — последние посты и дайджесты\n\n"
-        "Когда придёт дайджест — нажми на нужную тему, бот напишет пост.\n"
-        "Потом: <b>✅ Постить</b> — публикация, "
-        "<b>✏️ Редактировать</b> — правка, "
-        "<b>🎨 Промпт</b> — картинка, "
-        "<b>❌ Отмена</b> — пропустить.",
+        i18n.t("start_message"),
         parse_mode="HTML",
     )
 
@@ -1107,10 +1103,7 @@ async def cmd_post(message: Message, state: FSMContext) -> None:
     """Start the manual post creation flow."""
     await state.set_state(ManualPostState.waiting_content)
     await message.answer(
-        "✍️ <b>Ручной режим — новый пост</b>\n\n"
-        "Пришли мне текст новости, ссылку или перешли сообщение, "
-        "по которому нужно сделать пост.\n\n"
-        "<i>/cancel — отмена</i>",
+        i18n.t("manual_intro"),
         parse_mode="HTML",
     )
 
@@ -1124,13 +1117,12 @@ async def cmd_status(message: Message) -> None:
 
     if digests:
         digest_emoji = {"pending": "⏳", "processed": "✅", "rejected": "❌"}
-        lines.append("<b>Последние дайджесты:</b>")
+        lines.append(i18n.t("status_recent_digests"))
         for d in digests:
             e = digest_emoji.get(d["status"], "❓")
             topic_count = len(d.get("topics", []))
             lines.append(
-                f"{e} <b>Дайджест #{d['id']}</b> [{d['status']}] "
-                f"— {d['date']} ({topic_count} тем)"
+                i18n.t("status_digest_line", e=e, id=d["id"], status=d["status"], date=d["date"], n=topic_count)
             )
 
     if posts:
@@ -1142,7 +1134,7 @@ async def cmd_status(message: Message) -> None:
             "approved":  "👍",
             "error":     "🔴",
         }
-        lines.append("\n<b>Последние посты:</b>")
+        lines.append("\n" + i18n.t("status_recent_posts"))
         for p in posts:
             e = emoji_map.get(p["status"], "❓")
             img = " 🎨" if p.get("image_prompt") else ""
@@ -1151,7 +1143,7 @@ async def cmd_status(message: Message) -> None:
             )
 
     if not lines:
-        await message.answer("Ничего нет.")
+        await message.answer(i18n.t("status_empty"))
         return
 
     await message.answer("\n".join(lines), parse_mode="HTML")
@@ -1162,14 +1154,61 @@ async def cmd_run(message: Message, bot: Bot) -> None:
     """Manually trigger the full digest pipeline."""
     from scheduler import run_pipeline_job  # local import to avoid circular dep
 
-    await message.answer("⚙️ Запускаю дайджест-пайплайн…")
+    await message.answer(i18n.t("running_pipeline"))
     try:
         await run_pipeline_job(bot)
     except Exception as exc:
         logger.exception("Manual pipeline run failed: %s", exc)
         await message.answer(
-            f"❌ Ошибка:\n<code>{exc}</code>", parse_mode="HTML"
+            i18n.t("run_error", err=exc), parse_mode="HTML"
         )
+
+
+# ---------------------------------------------------------------------------
+# Language: /language switcher + localized command menu
+# ---------------------------------------------------------------------------
+
+async def apply_command_menu(bot: Bot) -> None:
+    """(Re)register the bot command menu in the current UI language."""
+    from aiogram.types import BotCommand  # noqa: PLC0415
+    await bot.set_my_commands([
+        BotCommand(command="start",    description=i18n.t("cmd_start_desc")),
+        BotCommand(command="run",      description=i18n.t("cmd_run_desc")),
+        BotCommand(command="post",     description=i18n.t("cmd_post_desc")),
+        BotCommand(command="status",   description=i18n.t("cmd_status_desc")),
+        BotCommand(command="cancel",   description=i18n.t("cmd_cancel_desc")),
+        BotCommand(command="language", description=i18n.t("cmd_language_desc")),
+    ])
+
+
+def _language_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=i18n.t("btn_lang_ru"), callback_data="lang:ru"),
+        InlineKeyboardButton(text=i18n.t("btn_lang_en"), callback_data="lang:en"),
+    ]])
+
+
+@router.message(Command("language"))
+async def cmd_language(message: Message) -> None:
+    """Show the language picker (🇷🇺 / 🇬🇧)."""
+    await message.answer(i18n.t("choose_language"), reply_markup=_language_keyboard())
+
+
+@router.callback_query(F.data.startswith("lang:"))
+async def cb_set_language(call: CallbackQuery) -> None:
+    """Switch the whole interface + content language on the fly and remember it."""
+    lang = call.data.split(":")[1]  # type: ignore[union-attr]
+    i18n.set_language(lang)
+    await call.answer()
+    # Re-register the command menu in the new language, then confirm in the new language.
+    try:
+        await apply_command_menu(call.bot)  # type: ignore[arg-type]
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not update command menu after language switch: %s", exc)
+    try:
+        await call.message.edit_text(i18n.t("language_set"))  # type: ignore[union-attr]
+    except Exception:  # noqa: BLE001
+        await call.message.answer(i18n.t("language_set"))  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------
@@ -1180,7 +1219,7 @@ async def cmd_run(message: Message, bot: Bot) -> None:
 async def cb_digest_topic(call: CallbackQuery) -> None:
     """
     Admin clicked on a digest topic button.
-    1. Acknowledge immediately with "⏳ Пишу пост…"
+    1. Acknowledge immediately with i18n.t("writing_post_toast")
     2. Trigger WriterCrew for this specific topic.
     3. Send the resulting post variants back for approval.
     """
@@ -1191,18 +1230,18 @@ async def cb_digest_topic(call: CallbackQuery) -> None:
 
     digest = get_digest(digest_id)
     if not digest:
-        await call.answer("Дайджест не найден.", show_alert=True)
+        await call.answer(i18n.t("digest_not_found"), show_alert=True)
         return
 
     topics: list[dict] = digest.get("topics", [])
     topic = next((t for t in topics if t.get("index") == topic_index), None)
     if not topic:
-        await call.answer("Тема не найдена.", show_alert=True)
+        await call.answer(i18n.t("topic_not_found"), show_alert=True)
         return
 
-    await call.answer("⏳ Пишу пост…")
+    await call.answer(i18n.t("writing_post_toast"))
     await call.message.reply(  # type: ignore[union-attr]
-        f"⏳ <b>Пишу пост по теме:</b>\n\n"
+        i18n.t("writing_on_topic") + "\n\n" + 
         f"<b>{topic.get('title', '')}</b>\n"
         f"<i>{topic.get('summary', '')}</i>",
         parse_mode="HTML",
@@ -1342,7 +1381,7 @@ async def _run_writer_for_topic(bot: Bot, topic: dict) -> None:
     if not result.variants:
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text="⚠️ WriterCrew не вернул вариантов поста. Проверь логи.",
+            text=i18n.t("no_variants"),
         )
         return
 
@@ -1366,7 +1405,7 @@ async def _run_writer_for_topic(bot: Bot, topic: dict) -> None:
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=(
-                f"ℹ️ <b>Источник поста #{post_id}:</b>\n"
+                i18n.t("post_source", id=post_id) + 
                 f"{source_url}"
             ),
             parse_mode="HTML",
@@ -1385,10 +1424,10 @@ async def _run_writer_for_topic(bot: Bot, topic: dict) -> None:
 async def cb_digest_reject(call: CallbackQuery) -> None:
     digest_id = int(call.data.split(":")[-1])  # type: ignore[union-attr]
     update_digest_status(digest_id, "rejected")
-    await call.answer("Дайджест отклонён.")
+    await call.answer(i18n.t("digest_rejected_toast"))
     try:
         await call.message.edit_text(  # type: ignore[union-attr]
-            f"❌ Дайджест #{digest_id} отклонён.",
+            i18n.t("digest_rejected_full", id=digest_id),
             reply_markup=None,
         )
     except Exception:
@@ -1408,21 +1447,20 @@ async def cb_publish_variant(call: CallbackQuery) -> None:
 
     post = get_post(post_id)
     if not post:
-        await call.answer("Пост не найден.", show_alert=True)
+        await call.answer(i18n.t("post_not_found"), show_alert=True)
         return
 
     # ── Guard: if post is being edited, block direct publish ──────────────
     if post.get("status") == "editing":
         await call.answer(
-            "⚠️ Пост сейчас редактируется. Нажми «Постить» в сообщении "
-            "с подтверждением редактирования.",
+            i18n.t("edit_in_progress"),
             show_alert=True,
         )
         return
 
     variants: list[str] = post.get("variants", [])
     if variant_idx >= len(variants):
-        await call.answer("Вариант не найден.", show_alert=True)
+        await call.answer(i18n.t("variant_not_found"), show_alert=True)
         return
 
     update_status(post_id, "approved", selected_variant=variant_idx)
@@ -1443,16 +1481,16 @@ async def cb_image_prompt(call: CallbackQuery) -> None:
     post_id = int(call.data.split(":")[-1])  # type: ignore[union-attr]
     post = get_post(post_id)
     if not post:
-        await call.answer("Пост не найден.", show_alert=True)
+        await call.answer(i18n.t("post_not_found"), show_alert=True)
         return
 
     prompt = post.get("image_prompt") or ""
     if not prompt:
-        await call.answer("Промпт недоступен.", show_alert=True)
+        await call.answer(i18n.t("img_prompt_unavailable"), show_alert=True)
         return
 
     await call.message.reply(  # type: ignore[union-attr]
-        f"🎨 <b>Промпт для изображения (пост #{post_id}):</b>\n\n"
+        i18n.t("img_prompt_header", id=post_id) + "\n\n"
         f"<code>{prompt}</code>",
         parse_mode="HTML",
     )
@@ -1472,17 +1510,17 @@ async def cb_reject(call: CallbackQuery) -> None:
     if post:
         _delete_media_file(post.get("media_path"))
     # answer first — always — so Telegram stops the spinner
-    await call.answer("Отклонено.")
+    await call.answer(i18n.t("post_rejected_toast"))
     # message may be a photo/video (no edit_text), try gracefully
     try:
         await call.message.edit_text(  # type: ignore[union-attr]
-            f"❌ Пост #{post_id} отклонён.",
+            i18n.t("post_rejected_full", id=post_id),
             reply_markup=None,
         )
     except Exception:
         try:
             await call.message.edit_caption(  # type: ignore[union-attr]
-                caption=f"❌ Пост #{post_id} отклонён.",
+                caption=i18n.t("post_rejected_full", id=post_id),
                 reply_markup=None,
             )
         except Exception:
@@ -1498,7 +1536,7 @@ async def cb_edit_start(call: CallbackQuery, state: FSMContext) -> None:
     post_id = int(call.data.split(":")[-1])  # type: ignore[union-attr]
     post = get_post(post_id)
     if not post:
-        await call.answer("Пост не найден.", show_alert=True)
+        await call.answer(i18n.t("post_not_found"), show_alert=True)
         return
 
     update_status(post_id, "editing")
@@ -1520,7 +1558,7 @@ async def cb_edit_start(call: CallbackQuery, state: FSMContext) -> None:
         )
         # Notify admin to use the confirm message's button
         await call.answer(
-            "⚠️ Используй кнопку «Постить» в НОВОМ сообщении с подтверждением.",
+            i18n.t("use_new_confirm"),
             show_alert=True,
         )
 
@@ -1528,11 +1566,7 @@ async def cb_edit_start(call: CallbackQuery, state: FSMContext) -> None:
     reference = variants[0] if variants else ""
 
     await call.message.reply(  # type: ignore[union-attr]
-        "✏️ <b>Режим редактирования</b>\n\n"
-        "Ниже — текст поста как он выглядит сейчас.\n"
-        "Скопируй, отредактируй и пришли обратно — я опубликую в канал с сохранением "
-        "всего форматирования и премиум-эмодзи.\n\n"
-        "/cancel — отмена",
+        i18n.t("edit_mode"),
         parse_mode="HTML",
     )
 
@@ -1548,7 +1582,7 @@ async def cb_edit_start(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Command("cancel"), ManualPostState.waiting_content)
 async def cmd_cancel_manual(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("✍️ Ручной режим отменён.")
+    await message.answer(i18n.t("manual_cancelled"))
 
 
 @router.message(Command("cancel"), EditState.waiting_text)
@@ -1558,14 +1592,14 @@ async def cmd_cancel_edit(message: Message, state: FSMContext) -> None:
     if post_id := data.get("post_id"):
         update_status(post_id, "pending")
     await state.clear()
-    await message.answer("Редактирование отменено.")
+    await message.answer(i18n.t("edit_cancelled"))
 
 
 @router.message(EditState.waiting_text)
 async def fsm_receive_text(message: Message, state: FSMContext) -> None:
     raw = message.text or ""
     if not raw.strip():
-        await message.answer("Текст не должен быть пустым. Попробуй ещё раз или /cancel.")
+        await message.answer(i18n.t("text_empty"))
         return
 
     data = await state.get_data()
@@ -1597,7 +1631,7 @@ async def fsm_receive_text(message: Message, state: FSMContext) -> None:
     )
 
     await message.answer(
-        "<b>✅ Текст сохранён.</b>\nНажми «Постить», чтобы опубликовать в канал.",
+        i18n.t("text_saved"),
         reply_markup=_edit_publish_keyboard(post_id),
         parse_mode="HTML",
     )
@@ -1619,7 +1653,7 @@ async def cb_confirm_edit(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
 
     if not edited_text:
-        await call.answer("Текст пустой.", show_alert=True)
+        await call.answer(i18n.t("text_is_empty"), show_alert=True)
         return
 
     import json  # noqa: PLC0415
@@ -1652,9 +1686,9 @@ async def cb_confirm_edit(call: CallbackQuery, state: FSMContext) -> None:
         )
         if ok:
             update_status(post_id, "published", final_text=edited_text)
-            await call.answer("Опубликовано!")
+            await call.answer(i18n.t("post_published_toast"))
             await call.message.edit_text(  # type: ignore[union-attr]
-                f"✅ <b>Пост #{post_id} опубликован в канале!</b>",
+                i18n.t("post_published_full", id=post_id),
                 reply_markup=None,
                 parse_mode="HTML",
             )
@@ -1679,7 +1713,7 @@ async def cb_cancel_edit_btn(call: CallbackQuery, state: FSMContext) -> None:
     post_id = int(call.data.split(":")[-1])  # type: ignore[union-attr]
     await state.clear()
     update_status(post_id, "pending")
-    await call.message.edit_text("Редактирование отменено.", reply_markup=None)  # type: ignore[union-attr]
+    await call.message.edit_text(i18n.t("edit_cancelled"), reply_markup=None)  # type: ignore[union-attr]
     await call.answer()
 
 
@@ -1724,12 +1758,11 @@ async def fsm_receive_manual_content(message: Message, state: FSMContext) -> Non
 
     # If admin forwarded a message without text (e.g. media-only), note it
     if not raw_text and message.forward_origin:
-        raw_text = "[Переслано сообщение без текста]"
+        raw_text = "[Forwarded message without text]"
 
     if not raw_text:
         await message.answer(
-            "Не получил текст. Пришли новость текстом, ссылкой или перешли сообщение.\n"
-            "Попробуй снова: /post",
+            i18n.t("manual_no_text"),
         )
         return
 
@@ -1746,7 +1779,7 @@ async def fsm_receive_manual_content(message: Message, state: FSMContext) -> Non
             elif not source_url:
                 source_url = candidate  # fallback: use TG link if nothing else
 
-    await message.answer("⏳ <b>Пишу пост…</b>", parse_mode="HTML")
+    await message.answer(i18n.t("writing_post"), parse_mode="HTML")
 
     # ── Download media from the forwarded/attached message (Bot API) ────
     # Bot API works fine here — no Telethon/CDN limitations.
@@ -1783,7 +1816,7 @@ async def fsm_receive_manual_content(message: Message, state: FSMContext) -> Non
         logger.exception("Manual WriterCrew failed: %s", exc)
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text=f"❌ Ошибка при написании поста:\n<code>{exc}</code>",
+            text=i18n.t("writing_error", err=exc),
             parse_mode="HTML",
         )
 
@@ -1830,7 +1863,7 @@ async def _process_media_group(
 
     # If forward without text but with media, note it
     if not raw_text and any(m.forward_origin for m in messages):
-        raw_text = "[Переслано сообщение с медиа без текста]"
+        raw_text = "[Forwarded message with media, no text]"
 
     if not raw_text:
         await state.clear()
@@ -1838,8 +1871,7 @@ async def _process_media_group(
         first_msg = messages[0]
         await bot.send_message(
             chat_id=first_msg.chat.id,
-            text="Не получил текст. Пришли новость текстом, ссылкой или перешли сообщение.\n"
-                 "Попробуй снова: /post",
+            text=i18n.t("manual_no_text"),
         )
         return
 
@@ -1884,17 +1916,17 @@ async def _process_media_group(
     await state.clear()
 
     # ── Notify admin and run pipeline ─────────────────────────────────
-    if raw_text == "[Переслано сообщение с медиа без текста]":
+    if raw_text == "[Forwarded message with media, no text]":
         await bot.send_message(
             chat_id=messages[0].chat.id,
-            text=f"⏳ <b>Пишу пост…</b>\n\n"
-                 f"<i>Получено {len(media_files)} медиа из пересланного сообщения.</i>",
+            text=i18n.t("writing_post") + "\n\n" + 
+                 i18n.t("media_received", n=len(media_files)),
             parse_mode="HTML",
         )
     else:
         await bot.send_message(
             chat_id=messages[0].chat.id,
-            text="⏳ <b>Пишу пост…</b>",
+            text=i18n.t("writing_post"),
             parse_mode="HTML",
         )
 
@@ -1906,7 +1938,7 @@ async def _process_media_group(
         logger.exception("Manual WriterCrew failed for media_group %s: %s", group_id, exc)
         await bot.send_message(
             chat_id=messages[0].chat.id,
-            text=f"❌ Ошибка при написании поста:\n<code>{exc}</code>",
+            text=i18n.t("writing_error", err=exc),
             parse_mode="HTML",
         )
 
@@ -1938,11 +1970,11 @@ async def _run_writer_for_manual(
     ext_source_url = source_url if source_url and "t.me/" not in source_url else ""
 
     news_items = [{
-        "source":     "ручная новость от автора канала",
+        "source":     "manual news from the channel author",
         "text":       (
-            "[РУЧНОЙ РЕЖИМ]\n"
-            "Автор канала прислал эту новость напрямую для публикации.\n"
-            "Напиши пост по тем же правилам стиля, что и для дайджеста.\n\n"
+            "[MANUAL MODE]\n"
+            "The channel author sent this news directly for publishing.\n"
+            "Write a post following the same style rules as for the digest.\n\n"
             + raw_content
         ),
         "date":       "",
@@ -1964,7 +1996,7 @@ async def _run_writer_for_manual(
     if not result.variants:
         await bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text="⚠️ WriterCrew не вернул вариантов поста. Проверь логи.",
+            text=i18n.t("no_variants"),
         )
         return
 

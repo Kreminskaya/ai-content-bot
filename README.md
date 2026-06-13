@@ -11,9 +11,9 @@
 [![aiogram](https://img.shields.io/badge/aiogram-3.x-blue)](https://docs.aiogram.dev)
 [![crewAI](https://img.shields.io/badge/crewAI-multi--agent-orange)](https://crewai.com)
 
-> Autonomous AI pipeline that monitors your sources, selects the best stories, and writes ready-to-publish Telegram channel posts — for any niche.
+> Your AI co-editor for running a Telegram channel. It monitors sources, picks the best stories, and writes ready-to-publish posts — then waits for your approval before anything goes live.
 
-Configure your sources once. The bot watches Telegram channels, RSS feeds, Reddit, HuggingFace, and GitHub, then drafts posts in your voice and sends them for your approval before anything goes live.
+Set up your sources once. The bot tracks Telegram channels, RSS feeds, Reddit, HuggingFace, GitHub, and more — selects what matters for your niche, drafts posts in your voice, and delivers them straight to your DMs. You read, approve or edit, hit publish. That's it.
 
 ---
 
@@ -27,6 +27,15 @@ Configure your sources once. The bot watches Telegram channels, RSS feeds, Reddi
 - 📰 **Digest mode** — twice-daily selection of top stories grouped by category, you pick which ones to publish
 - 🔄 **Any niche** — configure your own source list; the bot adapts to any topic (AI, finance, beauty, sports, anything)
 - 🚫 **Built-in filters** — deduplication, ad removal, freshness cutoff, skeptical-ending ban
+- 🌐 **Bilingual — Russian & English** — switch the whole interface *and* generated content on the fly with `/language` (🇷🇺 / 🇬🇧), like a language picker in a game; the choice is remembered across restarts
+
+---
+
+## 📱 Screenshots
+
+<div align="center">
+  <img src="assets/showcase_en.png" alt="Bot interface: language picker, daily digest, approve and publish" width="100%" />
+</div>
 
 ---
 
@@ -115,6 +124,7 @@ All settings live in `.env`. Key variables:
 | `LLM_PROVIDER` | `anthropic` or `openai` |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Your LLM API key |
 | `LLM_MODEL_NAME` | e.g. `claude-sonnet-4-6` or `gpt-4.1-mini` |
+| `LANGUAGE` | Initial interface & content language: `ru` or `en`. Users can switch any time with `/language` — the choice is saved to `runtime_state.json`. |
 
 Advanced settings (optional) are in `config.py`:
 - `RSS_SOURCES` — list of RSS feed URLs to monitor
@@ -143,7 +153,8 @@ ai-content-bot/
 │   └── ad_filter.py         # Heuristic ad/spam filter
 │
 ├── bot/
-│   └── handlers.py          # aiogram 3 handlers: approval flow, manual post, edit
+│   ├── handlers.py          # aiogram 3 handlers: approval flow, manual post, edit
+│   └── i18n.py              # Bilingual UI engine (RU/EN): all strings, /language switcher
 │
 ├── database/
 │   └── models.py            # SQLite schema + CRUD

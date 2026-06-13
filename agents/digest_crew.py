@@ -1,18 +1,21 @@
 """
-DigestCrew — Воронка: Сбор → Жёсткий фильтр → Аналитика → Дайджест.
+DigestCrew — funnel: Fetch → Hard filter → Analysis → Digest.
 
-Агент Аналитик принимает очищенный массив постов и формирует JSON-дайджест:
-  • Топ-4 Хард-Новостей  (Визуал и Продакшен / Мозги и LLM)
-  • Топ-3 Кейсов         (Кейс-истории продакшена: кино/реклама/клипы/игры)
-  • Топ-4 Полезностей    (Полезные сервисы / Роботы и железо)
+The Analyst agent takes a cleaned array of posts and builds a JSON digest:
+  • Top-4 Breaking News   (Visual & Production / AI & LLM)
+  • Top-3 Production Cases (film / ads / clips / games)
+  • Top-4 Useful Tools     (Useful Tools / Robots & Hardware)
 
-Итого до 11 тем → до 11 кнопок в Telegram для администратора.
+Up to 11 topics → up to 11 Telegram buttons for the admin.
 
-Поддерживает дедупликацию: принимает список уже показанных тем (url + заголовок)
-из предыдущих дайджестов и передаёт их аналитику как «не повторять».
+Supports deduplication: takes a list of already-shown topics (url + title)
+from previous digests and passes them to the analyst as "do not repeat".
 
-Используется в scheduler.py.
-Когда администратор нажимает кнопку темы, вызывается WriterCrew (agents/crew.py).
+Used by scheduler.py.
+When the admin taps a topic button, WriterCrew (agents/crew.py) is invoked.
+
+All user-facing strings (titles, summaries) follow the language chosen via
+/language (bot/i18n.py); category tags stay as stable English identifiers.
 """
 
 import asyncio
@@ -25,7 +28,13 @@ from functools import partial
 
 from crewai import Agent, Crew, LLM, Process, Task
 
-from config import ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, LLM_MODEL_NAME, LLM_PROVIDER, OFOXAI_API_KEY, OFOXAI_BASE_URL, OPENAI_API_KEY, OPENROUTER_API_KEY
+from config import (
+    ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, LLM_MODEL_NAME,
+    LLM_PROVIDER, OFOXAI_API_KEY, OFOXAI_BASE_URL, OPENAI_API_KEY, OPENROUTER_API_KEY,
+    CATEGORY_VISUAL, CATEGORY_LLM, CATEGORY_SERVICES, CATEGORY_ROBOTICS, CATEGORY_PRODUCTION,
+    HARD_CATEGORIES, USEFUL_CATEGORIES, PRODUCTION_CATEGORY, ALL_CATEGORIES,
+)
+from bot.i18n import content_language_name, get_language
 
 logger = logging.getLogger(__name__)
 
@@ -66,22 +75,10 @@ def _llm(temperature: float = 0.3) -> LLM:
 # Category constants (shared with bot/handlers.py via import)
 # ---------------------------------------------------------------------------
 
-CATEGORY_VISUAL      = "Визуал и Продакшен"
-CATEGORY_LLM         = "Мозги и LLM"
-CATEGORY_SERVICES    = "Полезные сервисы"
-CATEGORY_ROBOTICS    = "Роботы и железо"
-CATEGORY_PRODUCTION  = "Кейс-истории продакшена"
-
-# CATEGORY_PROMPTS removed — rerouted to services
-CATEGORY_PROMPTS     = "Полезные сервисы"
-
-HARD_CATEGORIES      = {CATEGORY_VISUAL, CATEGORY_LLM}
-USEFUL_CATEGORIES    = {CATEGORY_SERVICES, CATEGORY_ROBOTICS}
-PRODUCTION_CATEGORY  = {CATEGORY_PRODUCTION}
-
-ALL_CATEGORIES = (
-    HARD_CATEGORIES | USEFUL_CATEGORIES | PRODUCTION_CATEGORY
-)
+# Category constants are imported from config (single source of truth).
+# They are stable English tags — the user never sees them, only the localized
+# section header (bot/i18n.py) and the topic title in the chosen language.
+CATEGORY_PROMPTS = CATEGORY_SERVICES  # legacy alias: prompts rerouted to services
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +125,73 @@ class DigestResult:
 # Analyst agent
 # ---------------------------------------------------------------------------
 
-_ANALYST_SYSTEM = """\
+# ---------------------------------------------------------------------------
+# CUSTOMIZE FOR YOUR NICHE: the analyst prompts below are written for an AI/tech
+# channel. Replace the 5 categories and their examples with whatever makes sense
+# for your channel (fashion trends, finance news, sports, etc.).
+# The JSON structure (hard_news / production_cases / useful) can also be renamed
+# to match your editorial buckets — just keep the three arrays.
+# ---------------------------------------------------------------------------
+
+_ANALYST_SYSTEM_EN = """\
+You are the editor-in-chief of an AI publication with a broad view: you follow both \
+technology news and real-world cases of AI being used across industries.
+
+You receive a cleaned array of raw posts from Telegram channels, Reddit, RSS feeds \
+and digest sites.
+
+Your job is to discard the noise (lawsuits, stock drops, corporate scandals, \
+press releases with no substance) and sort the relevant content into 5 categories:
+
+1. Visual & Production
+   • ComfyUI, FaceSwap, image/video generation, nodes, workflows, Figma+AI
+   • New tools for photo and video generation
+
+2. AI & LLM
+   • New model releases: OpenAI, Anthropic, Google, DeepSeek, Qwen, local LLMs
+   • Benchmarks, research, RLHF, reasoning, agents
+
+3. Useful Tools
+   • New AI tools for work, aggregators, platforms
+   • Product Hunt AI — new entries from the AI Tools category
+   • TLDR AI, The Rundown, Ben's Bites — fresh tools
+
+4. Robots & Hardware
+   • Humanoid robots, AI drones, robot dogs — new models and demos
+   • Chinese, Japanese, American developments (Unitree, Boston Dynamics, Tesla Optimus, etc.)
+   • AI chips, neuromorphic processors, new inference hardware
+   • HuggingFace: popular new models, datasets, trending repos
+   • GitHub: interesting AI repos (agents, vibe-coding, local LLMs)
+
+5. Production Cases
+   • Directors, studios, brands using AI for shoots (ads, music videos, mini-series, \
+trailers, short films)
+   • Cases like "ad made entirely with AI", "AI music video", "promo clip on Runway"
+   • Large productions using ComfyUI / Runway / Kling / Gen-2 / Seedance in real projects
+   • Marker keywords: "commercial", "music video", "short film", "ad", "campaign", \
+"shot with AI", "made with AI", "AI-generated video", "AI-generated film", "AI-generated ad"
+
+IMPORTANT SELECTION RULES:
+✅ Official releases you can try right now
+✅ Striking cases of AI use with a real result
+✅ Practical content the reader can use today
+✅ From several sources about one event — pick the best, discard the rest
+✅ FRESHNESS: prefer material ≤ 48 hours old. All else equal, take the fresher one.
+   Don't include topics older than 3 days if the feed has fresh alternatives.
+
+❌ Lawsuits, fines, regulatory scandals
+❌ Corporate statements with no technical substance
+❌ Topics with no link to real material
+❌ Other people's paid courses, masterclasses, webinars, online schools — that's
+   advertising someone else's training, not our content. Skip any "sign up for course X",
+   "masterclass on Y", "webinar Z", "enrollment open for...", "training on..." posts.
+❌ Announcements of other people's educational products or training cohorts.
+❌ Roundup posts like "top prompts", "useful ChatGPT prompts", "AI life hacks" — not our content.
+"""
+
+
+# Russian analyst system prompt — Natalie's original, kept verbatim.
+_ANALYST_SYSTEM_RU = """\
 Ты — Главред AI-издания с широким взглядом: следишь и за технологическими новостями, и за \
 реальными кейсами применения ИИ в индустрии.
 
@@ -187,13 +250,17 @@ _ANALYST_SYSTEM = """\
 
 
 def _make_analyst(llm: LLM) -> Agent:
+    en = get_language() == "en"
     return Agent(
-        role="Главред AI-дайджеста",
+        role="AI digest editor-in-chief" if en else "Главред AI-дайджеста",
         goal=(
+            "Analyse the cleaned post feed and produce a structured JSON digest: "
+            "4 breaking-news items, up to 3 production cases, 4 useful tools."
+        ) if en else (
             "Проанализировать очищенную ленту постов и сформировать структурированный "
             "JSON-дайджест: 4 хард-новости, до 3 кейсов продакшена, 4 полезности."
         ),
-        backstory=_ANALYST_SYSTEM,
+        backstory=_ANALYST_SYSTEM_EN if en else _ANALYST_SYSTEM_RU,
         llm=llm,
         verbose=False,
         allow_delegation=False,
@@ -204,11 +271,19 @@ def _make_analyst(llm: LLM) -> Agent:
 # Analyst task
 # ---------------------------------------------------------------------------
 
-def _analysis_task(
+def _analysis_task(agent: Agent, news_feed: str, seen_block: str) -> Task:
+    """Dispatch to the language-specific analyst task."""
+    if get_language() == "en":
+        return _analysis_task_en(agent, news_feed, seen_block)
+    return _analysis_task_ru(agent, news_feed, seen_block)
+
+
+def _analysis_task_ru(
     agent: Agent,
     news_feed: str,
     seen_block: str,
 ) -> Task:
+    """Russian analyst task — Natalie's original, kept verbatim."""
     dedup_section = (
         f"\n\n─── ТЕМЫ, КОТОРЫЕ УЖЕ БЫЛИ В ПРЕДЫДУЩИХ ДАЙДЖЕСТАХ (НЕ ПОВТОРЯЙ) ───\n"
         f"{seen_block}\n"
@@ -279,6 +354,86 @@ def _analysis_task(
     )
 
 
+def _analysis_task_en(
+    agent: Agent,
+    news_feed: str,
+    seen_block: str,
+) -> Task:
+    dedup_section = (
+        f"\n\n─── TOPICS ALREADY COVERED IN PREVIOUS DIGESTS (DO NOT REPEAT) ───\n"
+        f"{seen_block}\n"
+        if seen_block.strip()
+        else ""
+    )
+
+    lang = content_language_name()
+
+    return Task(
+        description=(
+            f"LANGUAGE: write every \"title\" and \"summary\" in {lang}. "
+            f"The \"category\" field must be one of the exact English tags listed below "
+            f"(do NOT translate category tags).\n\n"
+            "Analyse the post feed below and build a digest.\n\n"
+            "REQUIRED RESPONSE FORMAT — strictly JSON (and only JSON, no prose around it):\n\n"
+            "{\n"
+            '  "hard_news": [\n'
+            "    {\n"
+            '      "title": "Topic headline in one line",\n'
+            '      "summary": "Brief gist in 2-3 sentences.",\n'
+            f'      "category": "{CATEGORY_VISUAL}",\n'
+            '      "url": "https://..."\n'
+            "    }\n"
+            "  ],\n"
+            '  "production_cases": [\n'
+            "    {\n"
+            '      "title": "Brand/studio + what they did with AI",\n'
+            '      "summary": "Case: who, what, which tool, result.",\n'
+            f'      "category": "{CATEGORY_PRODUCTION}",\n'
+            '      "url": "https://..."\n'
+            "    }\n"
+            "  ],\n"
+            '  "useful": [\n'
+            "    {\n"
+            '      "title": "Tool/tip headline",\n'
+            '      "summary": "Brief gist in 2-3 sentences.",\n'
+            f'      "category": "{CATEGORY_SERVICES}",\n'
+            '      "url": "https://..."\n'
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
+            "RULES FOR FILLING THE ARRAYS:\n"
+            "• title — SPECIFIC and INFORMATIVE. Format: '[What/Who] — [what happened]'.\n"
+            "  ✅ 'Runway ships Act-One — facial animation from video'\n"
+            "  ✅ 'Claude 4 available in the API — 1M token context'\n"
+            "  ❌ 'Interesting release in the video world'\n"
+            "  ❌ 'A new model from Anthropic'\n"
+            "  The title must be clear WITHOUT reading the summary.\n"
+            f"• hard_news         — 4 items (ONLY categories: '{CATEGORY_VISUAL}' or '{CATEGORY_LLM}')\n"
+            f"• production_cases  — 0–3 items (ONLY category: '{CATEGORY_PRODUCTION}')\n"
+            "  If there are no such cases in the feed — return an empty array []\n"
+            f"• useful            — 4 items (ONLY categories: '{CATEGORY_SERVICES}' or '{CATEGORY_ROBOTICS}')\n"
+            "• If there are fewer suitable posts than needed — include the best available\n"
+            "• url must be a real link from the feed, do not invent it\n"
+            "• Sort within each array: official releases by major players and striking "
+            "cases first, less important ones later\n"
+            "• Freshness matters: prefer topics ≤ 48 hours old. Don't take topics older\n"
+            "  than 3 days if equally good fresh alternatives exist.\n"
+            "• MUST NOT include: other people's courses, masterclasses, webinars, training "
+            "cohorts — any announcements of other authors'/schools' educational products.\n"
+            "• Respond with VALID JSON ONLY — no text before or after\n"
+            f"{dedup_section}"
+            "─────────────── POST FEED ───────────────\n\n"
+            f"{news_feed}"
+        ),
+        expected_output=(
+            "A valid JSON object with three arrays: "
+            "hard_news (4), production_cases (0-3), useful (4). "
+            "JSON only, no surrounding text."
+        ),
+        agent=agent,
+    )
+
+
 # ---------------------------------------------------------------------------
 # JSON output parser
 # ---------------------------------------------------------------------------
@@ -324,7 +479,8 @@ def _parse_digest_json(
         # 2. Keyword fallback: score items by shared title words
         title_words = set(topic.get("title", "").lower().split())
         # Remove noise words
-        stop = {"—", "-", "и", "в", "с", "на", "для", "по", "от", "из", "или"}
+        stop = {"—", "-", "the", "a", "an", "and", "or", "of", "for", "to", "in", "on", "with",
+                "и", "в", "с", "на", "для", "по", "от", "из", "или"}
         title_words -= stop
         if len(title_words) < 2:
             return {}
@@ -365,10 +521,10 @@ def _run_digest_sync(
     def _fmt_item(i: int, item: dict) -> str:
         date_str = str(item.get("date", "?"))[:25]
         has_media = item.get("media_path") or item.get("has_media")
-        media_note = " [медиа]" if has_media else ""
+        media_note = " [media]" if has_media else ""
         return (
             f"[{i+1}] {item.get('source', '')}\n"
-            f"Дата: {date_str}\n"
+            f"Date: {date_str}\n"
             f"URL: {item.get('url', '')}{media_note}\n\n"
             f"{item.get('text', '')[:600]}"
         )
@@ -381,9 +537,9 @@ def _run_digest_sync(
     from datetime import datetime as _dt
     _today = _dt.now().strftime("%d %B %Y")  # e.g. "17 April 2026"
     _temporal_header = (
-        f"══ ТЕКУЩАЯ ДАТА: {_today} ══\n"
-        "Все материалы ниже — свежие. Оценивай их актуальность "
-        "относительно этой даты.\n\n"
+        f"══ CURRENT DATE: {_today} ══\n"
+        "All material below is recent. Judge its relevance "
+        "relative to this date.\n\n"
     )
     news_feed = _temporal_header + news_feed
     # ───────────────────────────────────────────────────────────────────────
@@ -419,7 +575,7 @@ def _run_digest_sync(
     for item in hard_raw[:4]:
         hard_topics.append(DigestTopic(
             index=idx,
-            title=item.get("title", f"Тема {idx}"),
+            title=item.get("title", f"Topic {idx}"),
             summary=item.get("summary", ""),
             category=item.get("category", CATEGORY_LLM),
             url=item.get("url", ""),
@@ -433,7 +589,7 @@ def _run_digest_sync(
     for item in production_raw[:3]:
         production_topics.append(DigestTopic(
             index=idx,
-            title=item.get("title", f"Тема {idx}"),
+            title=item.get("title", f"Topic {idx}"),
             summary=item.get("summary", ""),
             category=CATEGORY_PRODUCTION,
             url=item.get("url", ""),
@@ -447,7 +603,7 @@ def _run_digest_sync(
     for item in useful_raw[:4]:
         useful_topics.append(DigestTopic(
             index=idx,
-            title=item.get("title", f"Тема {idx}"),
+            title=item.get("title", f"Topic {idx}"),
             summary=item.get("summary", ""),
             category=item.get("category", CATEGORY_SERVICES),
             url=item.get("url", ""),

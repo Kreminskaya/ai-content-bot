@@ -95,13 +95,8 @@ async def main() -> None:
     bot, dp = create_bot()
 
     logger.info("Registering bot command menu…")
-    await bot.set_my_commands([
-        BotCommand(command="start",  description="Главное меню"),
-        BotCommand(command="run",    description="Запустить дайджест вручную"),
-        BotCommand(command="post",   description="✍️ Написать пост по своей новости"),
-        BotCommand(command="status", description="Последние посты и дайджесты"),
-        BotCommand(command="cancel", description="Отменить текущее действие"),
-    ])
+    from bot.handlers import apply_command_menu  # noqa: PLC0415
+    await apply_command_menu(bot)
 
     logger.info("Setting up scheduler…")
     scheduler = setup_scheduler(bot)
